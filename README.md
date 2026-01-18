@@ -26,7 +26,7 @@ This repository contains the data and replication code for a paper examining the
 | `age` | Age |
 | `educ` | Years of education |
 | `marital` | Marital status: Married |
-| `CHILDS` | Number of children |
+| `childs` | Number of children |
 | `hsincome` | Household income (level) |
 | `race` | Race (categorical) |
 | `rural` | Rural residence indicator |
