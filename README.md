@@ -1,4 +1,4 @@
-# Occupational Embeddedness: The Effect of Strong Ties on Job Precarity
+# Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market
 
 **Lydia Camp**  
 [`https://lydiagcamp.github.io`](https://lydiagcamp.github.io)
