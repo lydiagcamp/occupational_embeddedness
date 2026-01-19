@@ -1,6 +1,6 @@
 ---
 title: "Replication Code"
-subtitle: "'Job Embeddness and Precarious Work'"
+subtitle: "'Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market'"
 author: Lydia Camp
 date: last-modified
 format:
@@ -8,7 +8,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    code-fold: false
+    code-fold: true
     code-summary: "Show code"
     code-copy: true
     code-overflow: wrap
@@ -40,13 +40,17 @@ library(scales)
 library(modelsummary)
 library(devtools)
 library(foreign)
-library(sandwich)
-library(tidyverse)
 library(stargazer) 
 library(effectsize)
 library(MASS)
 library(marginaleffects)
 library(broom)
+library(readxl)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(patchwork)
+library(showtext)
 ```
 
 ```{r}
@@ -81,11 +85,163 @@ library(broom)
   }
 
 # Load the data
-GSS_metadata <- read.dct("~/Desktop/MA UC3M/TFM/OE/Juan Paper/data/GSS.dct")
-GSS_ascii <- read.dat("~/Desktop/MA UC3M/TFM/OE/Juan Paper/data/GSS.dat", GSS_metadata)
+GSS_metadata <- read.dct("~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dct")
+GSS_ascii <- read.dat("~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dat", GSS_metadata)
 attr(GSS_ascii, "col.label") <- GSS_metadata[["ColLabel"]]
 GSS <- GSS_ascii
 ```
+
+# Theoretical Framework
+
+```{r}
+make_overlap_graph <- function(n_personal_total = 18,
+                               n_work_total     = 18,
+                               n_both           = 0,
+                               p_within         = 0.55,
+                               separation       = 3.0,
+                               seed             = 1) {
+  set.seed(seed)
+
+  stopifnot(n_both <= min(n_personal_total, n_work_total))
+
+  n_personal_only <- n_personal_total - n_both
+  n_work_only     <- n_work_total - n_both
+
+  nodes <- bind_rows(
+    tibble(name = "Respondent", group = "Respondent"),
+    tibble(name = paste0("P", seq_len(n_personal_only)), group = "Personal"),
+    if (n_both > 0) tibble(name = paste0("B", seq_len(n_both)), group = "Both"),
+    tibble(name = paste0("W", seq_len(n_work_only)), group = "Work")
+  ) |> 
+    mutate(group = as.character(group)) 
+
+  # helper: random within-edges
+  rand_edges <- function(vec, p) {
+    if (length(vec) < 2) return(tibble(from = character(), to = character()))
+    pairs <- t(combn(vec, 2))
+    keep <- runif(nrow(pairs)) < p
+    if (!any(keep)) return(tibble(from = character(), to = character()))
+    tibble(from = pairs[keep, 1], to = pairs[keep, 2])
+  }
+
+  edges <- tibble(from = character(), to = character(), type = character())
+
+  # Respondent connected to all alters
+  edges <- bind_rows(
+    edges,
+    tibble(
+      from = "Respondent",
+      to   = nodes$name[nodes$name != "Respondent"],
+      type = "ego"
+    )
+  )
+
+  # Define spheres 
+  personal_cluster <- nodes$name[nodes$group %in% c("Personal", "Both")]
+  work_cluster     <- nodes$name[nodes$group %in% c("Work", "Both")]
+
+  # within-sphere edges
+  edges <- bind_rows(
+    edges,
+    rand_edges(personal_cluster, p_within) |>  mutate(type = "within"),
+    rand_edges(work_cluster, p_within) |> mutate(type = "within")
+  )
+
+  g <- graph_from_data_frame(edges, directed = FALSE, vertices = nodes)
+  lay <- layout_with_fr(g)
+  rownames(lay) <- V(g)$name
+
+  lay["Respondent", ] <- c(0, 0)
+
+  personal_names <- nodes$name[nodes$group == "Personal"]
+  work_names     <- nodes$name[nodes$group == "Work"]
+  both_names     <- nodes$name[nodes$group == "Both"]
+
+  if (length(personal_names) > 0) lay[personal_names, 1] <- lay[personal_names, 1] - separation
+  if (length(work_names)     > 0) lay[work_names, 1]     <- lay[work_names, 1] + separation
+
+  # keep Both near center with small jitter
+  if (length(both_names) > 0) {
+    lay[both_names, 1] <- lay[both_names, 1] + rnorm(length(both_names), 0, 0.15)
+    lay[both_names, 2] <- lay[both_names, 2] + rnorm(length(both_names), 0, 0.15)
+  }
+
+  list(g = g, layout = lay)
+}
+
+
+# Create the function for making the plot
+plot_overlap <- function(obj, oe_label, show_legend = TRUE) {
+  cols <- c(
+    "Respondent" = "black",
+    "Personal"   = "#D73027",  
+    "Work"       = "#4575B4", 
+    "Both"       = "#7B3294"   
+  )
+
+  sizes <- c(
+    "Respondent" = 7.2,
+    "Personal"   = 3.9,
+    "Work"       = 3.9,
+    "Both"       = 5
+  )
+
+  tg <- as_tbl_graph(obj$g) |> 
+    activate(nodes) |> 
+    mutate(group = as.character(group))  
+  xr <- range(obj$layout[,1])
+  yr <- range(obj$layout[,2])
+ lx <- xr[1] - 0.20 * diff(xr)   # position the labels
+ly <- yr[2] + 0.15 * diff(yr)   
+
+  ggraph(tg, layout = "manual",
+         x = obj$layout[,1], y = obj$layout[,2]) +
+    geom_edge_link(colour = "grey65", alpha = 0.30, linewidth = 0.45) +
+    geom_node_point(aes(colour = group, size = group), alpha = 0.95) +
+    scale_colour_manual(
+  values = cols,
+  breaks = names(cols),
+  limits = names(cols),
+  drop   = FALSE,
+  labels = c("Respondent", "Personal", "Work", "Both")
+) +
+    coord_cartesian(clip = "off") +
+      scale_size_manual(values = sizes, limits = names(sizes), breaks = names(sizes)) +
+    annotate("text", x = lx, y = ly, label = oe_label,
+         hjust = 0, vjust = 0,
+         fontface = "bold",
+         family = "Times New Roman",
+         size = 6) +
+   guides(colour = guide_legend(override.aes = list(size = 6)), size = "none") +
+    theme_void() +
+    theme(
+      legend.position = if (show_legend) "right" else "none",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 15),
+legend.key.size = unit(1.2, "lines"),
+text = element_text(family = "Times New Roman"),
+plot.margin = margin(t = 40, r = 20, b = 20, l = 40)
+    )
+}
+
+# Create 3 scenarios
+g0  <- make_overlap_graph(n_both = 0,  separation = 3.4, seed = 1)
+g05 <- make_overlap_graph(n_both = 12, separation = 2.0, seed = 8)
+g1  <- make_overlap_graph(n_both = 18, separation = 0.0, seed = 5)
+
+# Plot
+p0  <- plot_overlap(g0,  oe_label = "(a) OE Score = 0.0",   show_legend = FALSE)
+p05 <- plot_overlap(g05, oe_label = "(b) OE Score = 0.5", show_legend = FALSE)
+p1  <- plot_overlap(g1,  oe_label = "(c) OE Score = 1.0",   show_legend = TRUE)
+
+fig <- (p0 / p05 / p1) + plot_layout(guides = "collect")
+fig
+
+# Save
+# ggsave("oe_overlap_panels.png", fig, width = 7.5, height = 10, dpi = 300)
+```
+
+![](oe_overlap_panels.png)
 
 # Clean Data
 
@@ -103,7 +259,6 @@ data <- clean_negatives(data)
 
 # remove variables not in dataset
 data2 <- data |>
- #select(-SEXORNT) |>
   filter(!(is.na(SEX1) & is.na(SEX2) & is.na(SEX3) & is.na(SEX4) & is.na(SEX5)))
 # remove observations that have NAs for all five contacts
 
@@ -151,11 +306,13 @@ data3 <- data2 %>%
                         COWORK5 == 2 ~ 0),
     help_find_job = 7 - HELPJOB,
     childs = CHILDS,
+    occ10_code = OCC10,
     sat_job = 5 - SATJOB,
     numgiven = NUMGIVEN, # total number of contacts
     prop_cowork = rowSums(across(c(cowork1, cowork2, cowork3, cowork4, cowork5)), 
                            na.rm = TRUE) / numgiven,
-   occ_major = as.numeric(substr(as.character(OCC10), 1, 1)), # 1-9 occ code
+   isco1 = as.numeric(substr(as.character(ISCO88), 1, 1)), # 1-9 occ code
+   isco2 = as.numeric(substr(as.character(ISCO88), 1, 2)), 
    sub_class = case_when(
       CLASS_ == 1 ~ "Lower class",
       CLASS_ == 2 ~ "Working class",
@@ -176,51 +333,7 @@ data3 <- data2 %>%
   )
 ```
 
-# Descriptive Statistics
-
-```{r}
-# BY CLASS
-data3 |>
-  group_by(sub_class) |>
-  summarise(
-    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
-    n = n()
-  )
-# more of a working and middle class pheonomenon (in terms of self-reported class identity)
-
-# BY 1-DIGIT OCC CODE
-data3 |>
-  group_by(occ_major) |>
-  summarise(
-    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
-    n = n()
-  )
-```
-
-![](images/data.png)
-
-![](images/descriptives-01.png)
-
-## Perceptions of Job Loss
-
-```{r}
-# BY CLASS
-data3 |>
-  group_by(sub_class) |>
-  summarise(
-    avg_prop_cowork = mean(joblike_lose, na.rm = TRUE),
-    n = n()
-  )
-# BY OCCUPATION
-data3 |>
-  group_by(occ_major) |>
-  summarise(
-    avg_prop_cowork = mean(joblike_lose, na.rm = TRUE),
-    n = n()
-  )
-```
-
-## Weight Networks by Degree of Contact
+## Create Weighted Network Measure
 
 ```{r}
 # Weight networks by the intensity of contact
@@ -244,24 +357,241 @@ data3 <- data3 |>
   ungroup()
 ```
 
+## Match By OCC 10 titles
+
+```{r}
+# Official Census 2010 occupation code list (with crosswalk file)
+occ_url <- "https://www2.census.gov/programs-surveys/demo/guidance/industry-occupation/2010-occ-codes-with-crosswalk-from-2002-2011.xls"
+
+tmp <- tempfile(fileext = ".xls")
+download.file(occ_url, tmp, mode = "wb")
+
+# Read the Excel and keep the 2010 code + title columns
+occ_lu_raw <- read_excel(tmp)
+
+occ10_lu <- occ_lu_raw |>
+  transmute(
+    occ10_code  = str_trim(as.character(`...3`)),
+    occ10_title = str_squish(as.character(`US Census Bureau`))
+  ) |>
+  filter(str_detect(occ10_code, "^\\d{4}$")) |>
+  mutate(
+    occ10_code = as.integer(occ10_code)
+  )
+
+# join onto your data 
+data3 <- data3 |>
+  left_join(occ10_lu, by = "occ10_code")
+```
+
+## Create ISCO 1-Digit and 2-Digit Labels
+
+```{r}
+# BY 1-DIGIT OCC CODE
+isco88_1digit <- tibble::tribble(
+  ~isco1, ~isco1_title,
+  0, "Armed forces",
+  1, "Legislators, senior officials and managers",
+  2, "Professionals",
+  3, "Technicians and associate professionals",
+  4, "Clerks",
+  5, "Service workers and shop and market sales workers",
+  6, "Skilled agricultural and fishery workers",
+  7, "Craft and related trades workers",
+  8, "Plant and machine operators and assemblers",
+  9, "Elementary occupations"
+)
+
+data3 <- data3 |>
+  left_join(isco88_1digit, by = "isco1")
+
+
+
+# BY 2-DIGIT OCC CODE
+# ISCO-88: 2-digit sub-major groups
+isco88_2digit <- tibble::tribble(
+  ~isco2, ~isco2_title,
+  11, "Legislators and senior officials",
+  12, "Corporate managers",
+  13, "General managers",
+  21, "Physical, mathematical and engineering science professionals",
+  22, "Life science and health professionals",
+  23, "Teaching professionals",
+  24, "Other professionals",
+  31, "Physical and engineering science associate professionals",
+  32, "Life science and health associate professionals",
+  33, "Teaching associate professionals",
+  34, "Other associate professionals",
+  41, "Office clerks",
+  42, "Customer services clerks",
+  51, "Personal and protective services workers",
+  52, "Models, salespersons and demonstrators",
+  61, "Market-oriented skilled agricultural and fishery workers",
+  62, "Subsistence agricultural and fishery workers",
+  71, "Extraction and building trades workers",
+  72, "Metal, machinery and related trades workers",
+  73, "Precision, handicraft, craft printing and related trades workers",
+  74, "Other craft and related trades workers",
+  81, "Stationary-plant and related operators",
+  82, "Machine operators and assemblers",
+  83, "Drivers and mobile-plant operators",
+  91, "Sales and services elementary occupations",
+  92, "Agricultural, fishery and related labourers",
+  93, "Labourers in mining, construction, manufacturing and transport"
+)
+
+data3 <- data3 |>
+  left_join(isco88_2digit, by = "isco2")
+
+```
+
+## Create EGP Schema
+
+```{r}
+# install once
+install.packages("remotes")
+remotes::install_github("pdparker/isco88conversion")
+
+library(isco88conversion)
+
+data3$EGP <- isco88conversion::convert(data3$ISCO88, type = "EGP")
+
+egp_labels <- c(
+  "Higher-grade service class",
+  "Lower-grade service class",
+  "Routine non-manual workers",
+  "Small proprietors (non-agricultural)",
+  "Lower technicians / skilled manual supervisors",
+  "Self-employed",
+  "Skilled manual workers",
+  "Semi- and unskilled manual workers",
+  "Agricultural workers",
+  "Farmers",
+  "Agricultural self-employed"
+)
+
+data3$EGP_title <- factor(
+  data3$EGP,
+  levels = 1:11,
+  labels = egp_labels
+)
+```
+
+# Descriptive Statistics
+
+## Weighted Coworker Measure
+
+```{r}
+data4 <- data3 |> 
+  filter(work == 1)
+## OF THOSE WHO WORK
+# BY CLASS
+data4 |>
+  group_by(sub_class) |>
+  summarise(
+    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
+    n = n()
+  )
+# more of a working and middle class pheonomenon (in terms of self-reported class identity)
+
+# BY 1-DIGIT OCC CODE
+data4 |>
+  group_by(isco1_title) |>
+  summarise(
+    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
+    n = n()
+  ) |> 
+  arrange(desc(avg_prop_cowork))
+```
+
+### By ISCO 2 Digit
+
+```{r}
+data4 |>
+  group_by(isco2_title) |>
+  summarise(
+    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
+    n = n()
+  ) |> 
+    arrange(desc(avg_prop_cowork))
+
+```
+
+### By OCC 10
+
+```{r}
+data4 |>
+  group_by(occ10_title) |>
+  summarise(
+    avg_prop_cowork = 100 * mean(weighted_cowork, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  ) |>
+  arrange(desc(avg_prop_cowork))
+
+```
+
+### By EGP
+
+```{r}
+data4 |>
+  group_by(EGP_title) |>
+  summarise(
+    avg_prop_cowork = 100*mean(weighted_cowork, na.rm = TRUE),
+    n = n()
+  ) |> 
+    arrange(desc(avg_prop_cowork))
+```
+
+![](images/OE-score.png)
+
+## Perceptions of Job Loss
+
+```{r}
+
+data4 <- data3 |> 
+  filter(work == 1)
+# BY CLASS
+data4 |>
+  group_by(sub_class) |>
+  summarise(
+    avg_prop_cowork = mean(joblike_lose, na.rm = TRUE),
+    n = n()
+  )
+# BY OCCUPATION
+data3 |>
+  group_by(occ_major) |>
+  summarise(
+    avg_prop_cowork = mean(joblike_lose, na.rm = TRUE),
+    n = n()
+  )
+```
+
 # Run Regressions
 
 ```{r}
 # likelihood of losing job
-m1 <- lm(joblike_lose ~ weighted_cowork + female + age + I(age^2) + educ + marital + CHILDS + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + factor(occ_major) + partyid + sub_class + sat_job, data = data3)
+m1a <- lm(joblike_lose ~ weighted_cowork + female + age + I(age^2) + educ + marital + CHILDS + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + factor(isco1) + partyid + sat_job, data = data3) # isco 1 digit FE
+
+m1b <- lm(joblike_lose ~ weighted_cowork + female + age + I(age^2) + educ + marital + CHILDS + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + EGP_title + partyid + sat_job + factor(isco1), data = data3) # EGP FE and ISCO 1 DIGIT FE
+summary(m1b)
 
 # Extract exact estimation sample used by m1
-mf_m1 <- model.frame(m1)
+mf_m1 <- model.frame(m1a)
 
 # Re-run pure model on same sample
 m1_pure <- lm(joblike_lose ~ weighted_cowork, data = mf_m1)
 
 
-# perceptions of job security
-m2 <- lm(job_sec ~ weighted_cowork + female + age + I(age^2) + marital + educ + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + CHILDS + factor(occ_major) + sub_class + partyid + sat_job, data = data3)
+# likelihood of losing job
+m2a <- lm(job_sec ~ weighted_cowork + female + age + I(age^2) + educ + marital + CHILDS + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + factor(isco1) + partyid + sat_job, data = data3) # isco 1 digit FE
+summary(m2a)
 
-# Extract exact estimation sample used by m2
-mf_m2 <- model.frame(m2)
+m2b <- lm(job_sec ~ weighted_cowork + female + age + I(age^2) + educ + marital + CHILDS + hsincome + race + rural + union + region + work_govt + log(hrs_week) + migrant + EGP_title + partyid + sat_job + factor(isco1), data = data3) # EGP FE and ISCO 1 DIGIT FE
+summary(m2b)
+
+# Extract exact estimation sample used by m1
+mf_m2 <- model.frame(m2a)
 
 # Re-run pure model on same sample
 m2_pure <- lm(job_sec ~ weighted_cowork, data = mf_m2)
@@ -280,10 +610,12 @@ bptest(m1) # not heteroskedastic
 ```{r}
 # define models
 models <- list(
-   "Job Loss (Pure)" = m1_pure,
-  "Job Loss (full)" = m1,
-   "Job Security (Pure)" = m2_pure,
-  "Job Security (Full)" = m2
+   "Job Loss" = m1_pure,
+  "Job Loss" = m1a,
+  "Job Loss" = m1b,
+   "Job Security" = m2_pure,
+  "Job Security" = m2a,
+  "Job Security" = m2b
 )
 
 # define variable names
@@ -308,11 +640,12 @@ coef_map <- c(
 # table
 modelsummary(
   models,
-  vcov = vcovHC,
+ # vcov = vcovHC,
   statistic = "std.error",
   coef_rename = coef_map,
   stars = TRUE,
-  gof_omit = "IC|Log|Adj|F"
+  gof_omit = "IC|Log|Adj|F",
+ output = "latex"
 )
 ```
 
@@ -340,12 +673,12 @@ descriptives
 
 # Prediction grid
 grid <- datagrid(
-  model = m2,
+  model = m2a,
   weighted_cowork = c(0, 0.5, 1)
 )
 
 pred <- predictions(
-  m2,
+  m2a,
   newdata = grid,
   conf_level = 0.95
 )
@@ -378,16 +711,25 @@ ggplot(pred, aes(x = weighted_cowork, y = estimate)) +
 
 ```{r}
 coefs <- bind_rows(
-  tidy(m2, conf.int = TRUE) |>  mutate(model = "With Controls"),
-  tidy(m2_pure, conf.int = TRUE) |>  mutate(model = "Without Controls")
+  tidy(m2_pure, conf.int = TRUE) |> 
+    mutate(model = "Without Controls"),
+  tidy(m2a, conf.int = TRUE) |>  
+    mutate(model = "With Controls"),
+  tidy(m2b, conf.int = TRUE) |>  
+    mutate(model = "With Controls + EGP dummies")
 ) |> 
   filter(term == "weighted_cowork") |> 
-  mutate(model = factor(model, levels = c("Without Controls", "With Controls")))
+  mutate(
+    model = factor(
+      model,
+      levels = c("Without Controls", "With Controls", "With Controls + EGP dummies")
+    )
+  )
 
-p <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
+p2 <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
   geom_errorbar(
     aes(ymin = conf.low, ymax = conf.high),
-    width = 0.18,      # CI "
+    width = 0.18,
     linewidth = 1.2
   ) +
   geom_point(size = 4) +
@@ -396,42 +738,49 @@ p <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
   scale_color_manual(
     values = c(
       "Without Controls" = "black",
-      "With Controls"    = "blue"   
+      "With Controls" = "blue",
+      "With Controls + EGP dummies" = "darkred"
     ),
     guide = "none"
   ) +
   labs(x = NULL, y = "Estimated Coefficient (95% CI)") +
-  theme_classic(base_size = 18) +
+  theme_classic(base_size = 15) +
   theme(
     text = element_text(family = "Times New Roman"),
     axis.title.y = element_text(size = 17, margin = margin(r = 12)),
-    axis.text.x = element_text(size = 15),
+    axis.text.x = element_text(size = 12),
     axis.text.y = element_text(size = 15),
     axis.line = element_line(linewidth = 0.9),
     axis.ticks = element_line(linewidth = 0.9)
   )
 
-p
-# save
-ggsave("coef_weighted_cowork.png", plot = p,
-       width = 7, height = 4.5, units = "in", dpi = 300, bg = "white")
+p2
 
 ```
 
-![](coef_weighted_cowork.png)
+![](coef_weighted2_cowork.png)
 
 ```{r}
 coefs <- bind_rows(
-  tidy(m1, conf.int = TRUE) |>  mutate(model = "With Controls"),
-  tidy(m1_pure, conf.int = TRUE) |>  mutate(model = "Without Controls")
+  tidy(m1_pure, conf.int = TRUE) |> 
+    mutate(model = "Without Controls"),
+  tidy(m1a, conf.int = TRUE) |>  
+    mutate(model = "With Controls"),
+  tidy(m1b, conf.int = TRUE) |>  
+    mutate(model = "With Controls + EGP dummies")
 ) |> 
   filter(term == "weighted_cowork") |> 
-  mutate(model = factor(model, levels = c("Without Controls", "With Controls")))
+  mutate(
+    model = factor(
+      model,
+      levels = c("Without Controls", "With Controls", "With Controls + EGP dummies")
+    )
+  )
 
-p <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
+p3 <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
   geom_errorbar(
     aes(ymin = conf.low, ymax = conf.high),
-    width = 0.18,      # CI "
+    width = 0.18,
     linewidth = 1.2
   ) +
   geom_point(size = 4) +
@@ -440,30 +789,24 @@ p <- ggplot(coefs, aes(x = model, y = estimate, color = model)) +
   scale_color_manual(
     values = c(
       "Without Controls" = "black",
-      "With Controls"    = "blue"   
+      "With Controls" = "blue",
+      "With Controls + EGP dummies" = "darkred"
     ),
     guide = "none"
   ) +
-  scale_y_continuous(
-  breaks = c(0.0, -0.3, -0.6, -0.9, -1.2),
-  limits = c(0.0, -1.2)
-) +
   labs(x = NULL, y = "Estimated Coefficient (95% CI)") +
-  theme_classic(base_size = 18) +
+  theme_classic(base_size = 15) +
   theme(
     text = element_text(family = "Times New Roman"),
     axis.title.y = element_text(size = 17, margin = margin(r = 12)),
-    axis.text.x = element_text(size = 15),
+    axis.text.x = element_text(size = 12),
     axis.text.y = element_text(size = 15),
     axis.line = element_line(linewidth = 0.9),
     axis.ticks = element_line(linewidth = 0.9)
   )
 
-p
-# save
-ggsave("job_loss.png", plot = p,
-       width = 7, height = 4.5, units = "in", dpi = 300, bg = "white")
+p3
 
 ```
 
-![](job_loss.png)
+![](coef_cowork2.png)
