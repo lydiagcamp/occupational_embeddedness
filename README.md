@@ -18,10 +18,10 @@ This repository contains the data and replication code for a paper examining the
 
 | Variable | Description |
 |--------|-------------|
+| `weighted_cowork` | Proportion of respondent's close contacts that are their coworkers (weighted by intensity of interaction) |
 | `joblike_lose` | Likelihood that respondent loses their job in the next 12 months (1-4) |
 | `job_sec` | Perceived job security (1-4) |
 | `sat_job` | Perceived job satisfaction (1-4) |
-| `weighted_cowork` | Proportion of respondent's close contacts that are their coworkers (weighted by intensity of interaction) |
 | `female` | Gender indicator (1 = female) |
 | `age` | Age |
 | `educ` | Years of education |
