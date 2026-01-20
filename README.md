@@ -1,5 +1,4 @@
-# Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market
-## Online Appendix
+# Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market (Online Appendix)
 
 **Lydia Camp**  
 [`https://lydiagcamp.github.io`](https://lydiagcamp.github.io)
