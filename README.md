@@ -7,7 +7,7 @@ This repository contains data and replicable code for a paper that explains diff
 
 ## Replication Materials
 - **Full Paper**  
-  [`Read the paper here!`](https://lydiagcamp.github.io/when_strikes_meet_stocks/Final_Paper.pdf)
+  [`Read the paper here!`](https://lydiagcamp.github.io/occupational_embeddedness/Final-Paper.pdf)
 
 - **Replication Code**  
   [`https://lydiagcamp.github.io/occupational_embeddedness/`](https://lydiagcamp.github.io/occupational_embeddedness/)
