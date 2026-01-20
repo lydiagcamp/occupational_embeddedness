@@ -145,6 +145,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#final-table" id="toc-final-table" class="nav-link" data-scroll-target="#final-table">Final Table</a></li>
   </ul></li>
   <li><a href="#visualization" id="toc-visualization" class="nav-link" data-scroll-target="#visualization">Visualization</a></li>
+  <li><a href="#linkedin-map-isco-titles" id="toc-linkedin-map-isco-titles" class="nav-link" data-scroll-target="#linkedin-map-isco-titles">LinkedIn Map ISCO Titles</a>
+  <ul class="collapse">
+  <li><a href="#create-prompt" id="toc-create-prompt" class="nav-link" data-scroll-target="#create-prompt">Create Prompt</a></li>
+  <li><a href="#create-isco-08-translation-function" id="toc-create-isco-08-translation-function" class="nav-link" data-scroll-target="#create-isco-08-translation-function">Create ISCO-08 Translation Function</a></li>
+  <li><a href="#apply-function" id="toc-apply-function" class="nav-link" data-scroll-target="#apply-function">Apply Function</a></li>
+  <li><a href="#compare-results-to-manual-coding" id="toc-compare-results-to-manual-coding" class="nav-link" data-scroll-target="#compare-results-to-manual-coding">Compare Results to Manual Coding</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -216,7 +223,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidygraph)</span>
 <span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggraph)</span>
 <span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(showtext)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(showtext)</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(httr2)</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(jsonlite)</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(openai)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <div class="cell">
@@ -253,8 +264,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>  }</span>
 <span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the data</span></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>GSS_metadata <span class="ot">&lt;-</span> <span class="fu">read.dct</span>(<span class="st">"~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dct"</span>)</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>GSS_ascii <span class="ot">&lt;-</span> <span class="fu">read.dat</span>(<span class="st">"~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dat"</span>, GSS_metadata)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>GSS_metadata <span class="ot">&lt;-</span> <span class="fu">read.dct</span>(<span class="st">"GSS.dct"</span>)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>GSS_ascii <span class="ot">&lt;-</span> <span class="fu">read.dat</span>(<span class="st">"GSS.dat"</span>, GSS_metadata)</span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="fu">attr</span>(GSS_ascii, <span class="st">"col.label"</span>) <span class="ot">&lt;-</span> GSS_metadata[[<span class="st">"ColLabel"</span>]]</span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>GSS <span class="ot">&lt;-</span> GSS_ascii</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
@@ -1020,8 +1031,206 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </details>
 </div>
 <p><img src="images/coef_cowork.png" class="img-fluid"></p>
+</section>
+<section id="linkedin-map-isco-titles" class="level1">
+<h1>LinkedIn Map ISCO Titles</h1>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load data for my LinkedIn Connections</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>Connections <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">".csv"</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>jobs_raw <span class="ot">&lt;-</span> Connections</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Set API key</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">OPENAI_API_KEY =</span> <span class="st">""</span>) <span class="co"># Real key hidden for privacy</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Clean data</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>df_panel <span class="ot">&lt;-</span> Connections <span class="sc">|&gt;</span>  <span class="fu">mutate</span>(<span class="at">Position =</span> <span class="fu">str_squish</span>(Position))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<section id="create-prompt" class="level2">
+<h2 class="anchored" data-anchor-id="create-prompt">Create Prompt</h2>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>ISCO_RULES <span class="ot">&lt;-</span> <span class="st">"</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="st">You are a professional annotator of professions, and your task is to classify each position/job title into its actual ISCO-08 4 digit code and label.</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="st">Please follow these rules:</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="st">1) If it says anything like scholarship or academic award (e.g. Fulbright), then don't give it an ISCO code but an NA. However, if someone clearly indicates that they are an ETA (English Teaching Assistant) or teacher, classify them accordingly.</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="st">2) If someone is a current student or </span><span class="sc">\"</span><span class="st">candidate</span><span class="sc">\"</span><span class="st"> (e.g. if the position includes </span><span class="sc">\"</span><span class="st">major</span><span class="sc">\"</span><span class="st"> or BA/BS/BBA/MBA/J.D./MA or </span><span class="sc">\"</span><span class="st">Master's</span><span class="sc">\"</span><span class="st"> etc.), then generally don't give them an ISCO code but also an NA. However, some people may include a previous degree in their position title even though they are currently working, so if you see a real job title in the position as well, then assign the ISCO code based on the occupation and disregard the university degree. Additionally, if you see that someone is a PhD or doctoral candidate, you can assume they are working and code their occupation based on the field of their PhD studies (likely somewhere within the 263 group).</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="st">3) If you are unable to classify to the 4 digit level because of ambiguity but you can accurately map to the 3-digit level, then set isco4_code to NA but fill isco3_code and isco3_label.</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="st">4) If it says self-employed or entrepreneur without a description of what the person is actually doing, set NA.</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="st">5) If it says anything related to worship, assume they are a singer at a religious organization.</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a><span class="st">6) If title is Spanish, translate to English internally and proceed.</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a><span class="st">7) If someone is a researcher or </span><span class="sc">\"</span><span class="st">fellow</span><span class="sc">\"</span><span class="st"> without specifying the field, place them in the university professor category. But if someone is a research assistant, place them within the 263 group if possible; try to classify to 4-digit using context clues.</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a><span class="st">8) Try your best to find a 4 digit code for all observations, but do not force it. Prefer NA over an obviously wrong answer.</span></span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a><span class="st">Return ONLY a single JSON object with these keys:</span></span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a><span class="st">isco4_code (string or null),</span></span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a><span class="st">isco4_label (string or null),</span></span>
+<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a><span class="st">isco3_code (string or null),</span></span>
+<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a><span class="st">isco3_label (string or null),</span></span>
+<span id="cb22-19"><a href="#cb22-19" aria-hidden="true" tabindex="-1"></a><span class="st">position_english (string),</span></span>
+<span id="cb22-20"><a href="#cb22-20" aria-hidden="true" tabindex="-1"></a><span class="st">notes (string).</span></span>
+<span id="cb22-21"><a href="#cb22-21" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="create-isco-08-translation-function" class="level2">
+<h2 class="anchored" data-anchor-id="create-isco-08-translation-function">Create ISCO-08 Translation Function</h2>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create function</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>isco_code_one <span class="ot">&lt;-</span> <span class="cf">function</span>(position, <span class="at">company =</span> <span class="cn">NA_character_</span>) {</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Clean inputs</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  position <span class="ot">&lt;-</span> position <span class="sc">|&gt;</span>  <span class="fu">as.character</span>() <span class="sc">|&gt;</span>  stringr<span class="sc">::</span><span class="fu">str_squish</span>()</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  company  <span class="ot">&lt;-</span> company  <span class="sc">|&gt;</span>  <span class="fu">as.character</span>() <span class="sc">|&gt;</span>  stringr<span class="sc">::</span><span class="fu">str_squish</span>()</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.na</span>(company)) company <span class="ot">&lt;-</span> <span class="st">""</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>  prompt <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Classify this job title into ISCO-08.</span><span class="sc">\n\n</span><span class="st">"</span>,</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"POSITION: "</span>, position, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"COMPANY: "</span>, company, <span class="st">"</span><span class="sc">\n\n</span><span class="st">"</span>,</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Output JSON only."</span></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>  r <span class="ot">&lt;-</span> httr2<span class="sc">::</span><span class="fu">request</span>(<span class="st">"https://api.openai.com/v1/chat/completions"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    httr2<span class="sc">::</span><span class="fu">req_headers</span>(</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>      <span class="at">Authorization =</span> <span class="fu">paste</span>(<span class="st">"Bearer"</span>, <span class="fu">Sys.getenv</span>(<span class="st">"OPENAI_API_KEY"</span>)),</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>      <span class="st">`</span><span class="at">Content-Type</span><span class="st">`</span> <span class="ot">=</span> <span class="st">"application/json"</span></span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span></span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    httr2<span class="sc">::</span><span class="fu">req_body_json</span>(<span class="fu">list</span>(</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">model =</span> <span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>      <span class="at">messages =</span> <span class="fu">list</span>(</span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>        <span class="fu">list</span>(<span class="at">role =</span> <span class="st">"system"</span>, <span class="at">content =</span> ISCO_RULES),</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>        <span class="fu">list</span>(<span class="at">role =</span> <span class="st">"user"</span>, <span class="at">content =</span> prompt)</span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a>      <span class="at">temperature =</span> <span class="dv">0</span>,</span>
+<span id="cb23-27"><a href="#cb23-27" aria-hidden="true" tabindex="-1"></a>      <span class="at">response_format =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">"json_object"</span>)</span>
+<span id="cb23-28"><a href="#cb23-28" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">|&gt;</span></span>
+<span id="cb23-29"><a href="#cb23-29" aria-hidden="true" tabindex="-1"></a>    httr2<span class="sc">::</span><span class="fu">req_perform</span>()</span>
+<span id="cb23-30"><a href="#cb23-30" aria-hidden="true" tabindex="-1"></a>  body <span class="ot">&lt;-</span> httr2<span class="sc">::</span><span class="fu">resp_body_json</span>(r, <span class="at">simplifyVector =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb23-31"><a href="#cb23-31" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(body<span class="sc">$</span>error)) {</span>
+<span id="cb23-32"><a href="#cb23-32" aria-hidden="true" tabindex="-1"></a>    msg <span class="ot">&lt;-</span> body<span class="sc">$</span>error<span class="sc">$</span>message <span class="sc">%||%</span> <span class="st">"Unknown OpenAI API error"</span></span>
+<span id="cb23-33"><a href="#cb23-33" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(msg)</span>
+<span id="cb23-34"><a href="#cb23-34" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(body<span class="sc">$</span>choices) <span class="sc">||</span> <span class="fu">length</span>(body<span class="sc">$</span>choices) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"No choices returned by API"</span>)</span>
+<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a>  content <span class="ot">&lt;-</span> body<span class="sc">$</span>choices[[<span class="dv">1</span>]]<span class="sc">$</span>message<span class="sc">$</span>content</span>
+<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(content) <span class="sc">||</span> <span class="sc">!</span><span class="fu">nzchar</span>(content)) {</span>
+<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"Empty message content returned by API"</span>)</span>
+<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a>  parsed <span class="ot">&lt;-</span> jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(content, <span class="at">simplifyVector =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a>  needed <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"isco4_code"</span>,<span class="st">"isco4_label"</span>,<span class="st">"isco3_code"</span>,<span class="st">"isco3_label"</span>,<span class="st">"position_english"</span>,<span class="st">"notes"</span>)</span>
+<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (k <span class="cf">in</span> needed) <span class="cf">if</span> (<span class="fu">is.null</span>(parsed[[k]])) parsed[[k]] <span class="ot">&lt;-</span> <span class="cn">NA_character_</span></span>
+<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>  parsed</span>
+<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a><span class="co"># Safeguard wrapper </span></span>
+<span id="cb23-53"><a href="#cb23-53" aria-hidden="true" tabindex="-1"></a>isco_code_safe <span class="ot">&lt;-</span> <span class="cf">function</span>(position, <span class="at">company =</span> <span class="cn">NA_character_</span>) {</span>
+<span id="cb23-54"><a href="#cb23-54" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(</span>
+<span id="cb23-55"><a href="#cb23-55" aria-hidden="true" tabindex="-1"></a>    <span class="fu">isco_code_one</span>(position, company),</span>
+<span id="cb23-56"><a href="#cb23-56" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) {</span>
+<span id="cb23-57"><a href="#cb23-57" aria-hidden="true" tabindex="-1"></a>      <span class="fu">warning</span>(<span class="st">"Failed for position: "</span>, position, <span class="st">" | Error: "</span>, e<span class="sc">$</span>message)</span>
+<span id="cb23-58"><a href="#cb23-58" aria-hidden="true" tabindex="-1"></a>      <span class="fu">return</span>(<span class="fu">list</span>(</span>
+<span id="cb23-59"><a href="#cb23-59" aria-hidden="true" tabindex="-1"></a>        <span class="at">isco4_code =</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb23-60"><a href="#cb23-60" aria-hidden="true" tabindex="-1"></a>        <span class="at">isco4_label =</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb23-61"><a href="#cb23-61" aria-hidden="true" tabindex="-1"></a>        <span class="at">isco3_code =</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb23-62"><a href="#cb23-62" aria-hidden="true" tabindex="-1"></a>        <span class="at">isco3_label =</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb23-63"><a href="#cb23-63" aria-hidden="true" tabindex="-1"></a>        <span class="at">position_english =</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb23-64"><a href="#cb23-64" aria-hidden="true" tabindex="-1"></a>        <span class="at">notes =</span> <span class="fu">paste0</span>(<span class="st">"Error: "</span>, e<span class="sc">$</span>message)</span>
+<span id="cb23-65"><a href="#cb23-65" aria-hidden="true" tabindex="-1"></a>      ))</span>
+<span id="cb23-66"><a href="#cb23-66" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb23-67"><a href="#cb23-67" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb23-68"><a href="#cb23-68" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="apply-function" class="level2">
+<h2 class="anchored" data-anchor-id="apply-function">Apply Function</h2>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Apply function to my data</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>isco_code_df <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">position_col =</span> <span class="st">"Position"</span>, <span class="at">company_col =</span> <span class="st">"Company"</span>) {</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>(position_col <span class="sc">%in%</span> <span class="fu">names</span>(df))) <span class="fu">stop</span>(<span class="st">"Missing column: "</span>, position_col)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>(company_col <span class="sc">%in%</span> <span class="fu">names</span>(df))) df[[company_col]] <span class="ot">&lt;-</span> <span class="st">""</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  out_list <span class="ot">&lt;-</span> <span class="fu">mapply</span>(</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">FUN =</span> <span class="cf">function</span>(pos, comp) <span class="fu">isco_code_safe</span>(pos, comp),</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    df[[position_col]],</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    df[[company_col]],</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">SIMPLIFY =</span> <span class="cn">FALSE</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>  out_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">lapply</span>(out_list, as.data.frame))</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_cols</span>(df, out_df)</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the data through the API </span></span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">isco_code_df</span>(df_panel, <span class="at">position_col =</span> <span class="st">"Position"</span>, <span class="at">company_col =</span> <span class="st">"Company"</span>)</span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-21"><a href="#cb24-21" aria-hidden="true" tabindex="-1"></a><span class="co">#save </span></span>
+<span id="cb24-22"><a href="#cb24-22" aria-hidden="true" tabindex="-1"></a><span class="co"># write.csv(result, "result.csv", row.names = FALSE)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="compare-results-to-manual-coding" class="level2">
+<h2 class="anchored" data-anchor-id="compare-results-to-manual-coding">Compare Results to Manual Coding</h2>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load manual coding</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">""</span>)</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>jobs_with_id <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">""</span>)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="co"># add ID to both for matching</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> result <span class="sc">|&gt;</span> </span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id =</span> <span class="fu">row_number</span>())</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>jobs_with_id <span class="ot">&lt;-</span> jobs_with_id <span class="sc">|&gt;</span> </span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id =</span> <span class="fu">row_number</span>())</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a><span class="co"># merge datasets</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>joined_df <span class="ot">&lt;-</span> jobs_with_id <span class="sc">|&gt;</span> </span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(result, <span class="at">by =</span> <span class="st">"id"</span>)</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>joined_df <span class="ot">&lt;-</span> joined_df <span class="sc">|&gt;</span> </span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">isco4_manual =</span> <span class="st">`</span><span class="at">ISCO 4 digit</span><span class="st">`</span>)</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a><span class="co">#write.csv(joined_df, "joined_df.csv", row.names = FALSE)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate percent match</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>accuracy_levels <span class="ot">&lt;-</span> joined_df <span class="sc">|&gt;</span> </span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">isco4_code   =</span> <span class="fu">str_squish</span>(isco4_code),</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">isco4_manual =</span> <span class="fu">str_squish</span>(isco4_manual)</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(isco4_code), <span class="sc">!</span><span class="fu">is.na</span>(isco4_manual)) <span class="sc">|&gt;</span> </span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">accuracy_1digit =</span> <span class="fu">mean</span>(<span class="fu">substr</span>(isco4_code, <span class="dv">1</span>, <span class="dv">1</span>) <span class="sc">==</span> <span class="fu">substr</span>(isco4_manual, <span class="dv">1</span>, <span class="dv">1</span>)) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">accuracy_2digit =</span> <span class="fu">mean</span>(<span class="fu">substr</span>(isco4_code, <span class="dv">1</span>, <span class="dv">2</span>) <span class="sc">==</span> <span class="fu">substr</span>(isco4_manual, <span class="dv">1</span>, <span class="dv">2</span>)) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">accuracy_3digit =</span> <span class="fu">mean</span>(<span class="fu">substr</span>(isco4_code, <span class="dv">1</span>, <span class="dv">3</span>) <span class="sc">==</span> <span class="fu">substr</span>(isco4_manual, <span class="dv">1</span>, <span class="dv">3</span>)) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">accuracy_4digit =</span> <span class="fu">mean</span>(isco4_code <span class="sc">==</span> isco4_manual) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">n =</span> <span class="fu">n</span>()</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>accuracy_levels</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

@@ -51,6 +51,10 @@ library(tidygraph)
 library(ggraph)
 library(patchwork)
 library(showtext)
+library(httr2)
+library(jsonlite)
+library(purrr)
+library(openai)
 ```
 
 ```{r}
@@ -85,8 +89,8 @@ library(showtext)
   }
 
 # Load the data
-GSS_metadata <- read.dct("~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dct")
-GSS_ascii <- read.dat("~/Desktop/MA UC3M/TFM/OE/Juan Paper/result/GSS.dat", GSS_metadata)
+GSS_metadata <- read.dct("GSS.dct")
+GSS_ascii <- read.dat("GSS.dat", GSS_metadata)
 attr(GSS_ascii, "col.label") <- GSS_metadata[["ColLabel"]]
 GSS <- GSS_ascii
 ```
@@ -810,3 +814,185 @@ p3
 ```
 
 ![](images/coef_cowork.png)
+
+# LinkedIn Map ISCO Titles
+
+```{r}
+# Load data for my LinkedIn Connections
+Connections <- read_csv(".csv")
+jobs_raw <- Connections
+
+# Set API key
+Sys.setenv(OPENAI_API_KEY = "") # Real key hidden for privacy
+
+# Clean data
+df_panel <- Connections |>  mutate(Position = str_squish(Position))
+```
+
+## Create Prompt
+
+```{r}
+ISCO_RULES <- "
+You are a professional annotator of professions, and your task is to classify each position/job title into its actual ISCO-08 4 digit code and label.
+
+Please follow these rules:
+1) If it says anything like scholarship or academic award (e.g. Fulbright), then don't give it an ISCO code but an NA. However, if someone clearly indicates that they are an ETA (English Teaching Assistant) or teacher, classify them accordingly.
+2) If someone is a current student or \"candidate\" (e.g. if the position includes \"major\" or BA/BS/BBA/MBA/J.D./MA or \"Master's\" etc.), then generally don't give them an ISCO code but also an NA. However, some people may include a previous degree in their position title even though they are currently working, so if you see a real job title in the position as well, then assign the ISCO code based on the occupation and disregard the university degree. Additionally, if you see that someone is a PhD or doctoral candidate, you can assume they are working and code their occupation based on the field of their PhD studies (likely somewhere within the 263 group).
+3) If you are unable to classify to the 4 digit level because of ambiguity but you can accurately map to the 3-digit level, then set isco4_code to NA but fill isco3_code and isco3_label.
+4) If it says self-employed or entrepreneur without a description of what the person is actually doing, set NA.
+5) If it says anything related to worship, assume they are a singer at a religious organization.
+6) If title is Spanish, translate to English internally and proceed.
+7) If someone is a researcher or \"fellow\" without specifying the field, place them in the university professor category. But if someone is a research assistant, place them within the 263 group if possible; try to classify to 4-digit using context clues.
+8) Try your best to find a 4 digit code for all observations, but do not force it. Prefer NA over an obviously wrong answer.
+
+Return ONLY a single JSON object with these keys:
+isco4_code (string or null),
+isco4_label (string or null),
+isco3_code (string or null),
+isco3_label (string or null),
+position_english (string),
+notes (string).
+"
+```
+
+## Create ISCO-08 Translation Function
+
+```{r}
+# Create function
+isco_code_one <- function(position, company = NA_character_) {
+  # Clean inputs
+  position <- position |>  as.character() |>  stringr::str_squish()
+  company  <- company  |>  as.character() |>  stringr::str_squish()
+  if (is.na(company)) company <- ""
+
+  prompt <- paste0(
+    "Classify this job title into ISCO-08.\n\n",
+    "POSITION: ", position, "\n",
+    "COMPANY: ", company, "\n\n",
+    "Output JSON only."
+  )
+
+  r <- httr2::request("https://api.openai.com/v1/chat/completions") |>
+    httr2::req_headers(
+      Authorization = paste("Bearer", Sys.getenv("OPENAI_API_KEY")),
+      `Content-Type` = "application/json"
+    ) |>
+    httr2::req_body_json(list(
+      model = "gpt-4o-mini",
+      messages = list(
+        list(role = "system", content = ISCO_RULES),
+        list(role = "user", content = prompt)
+      ),
+      temperature = 0,
+      response_format = list(type = "json_object")
+    )) |>
+    httr2::req_perform()
+  body <- httr2::resp_body_json(r, simplifyVector = FALSE)
+  if (!is.null(body$error)) {
+    msg <- body$error$message %||% "Unknown OpenAI API error"
+    stop(msg)
+  }
+  if (is.null(body$choices) || length(body$choices) == 0) {
+    stop("No choices returned by API")
+  }
+
+  content <- body$choices[[1]]$message$content
+  if (is.null(content) || !nzchar(content)) {
+    stop("Empty message content returned by API")
+  }
+  parsed <- jsonlite::fromJSON(content, simplifyVector = TRUE)
+
+  needed <- c("isco4_code","isco4_label","isco3_code","isco3_label","position_english","notes")
+  for (k in needed) if (is.null(parsed[[k]])) parsed[[k]] <- NA_character_
+
+  parsed
+}
+
+
+# Safeguard wrapper 
+isco_code_safe <- function(position, company = NA_character_) {
+  tryCatch(
+    isco_code_one(position, company),
+    error = function(e) {
+      warning("Failed for position: ", position, " | Error: ", e$message)
+      return(list(
+        isco4_code = NA_character_,
+        isco4_label = NA_character_,
+        isco3_code = NA_character_,
+        isco3_label = NA_character_,
+        position_english = NA_character_,
+        notes = paste0("Error: ", e$message)
+      ))
+    }
+  )
+}
+
+```
+
+## Apply Function
+
+```{r}
+# Apply function to my data
+isco_code_df <- function(df, position_col = "Position", company_col = "Company") {
+  if (!(position_col %in% names(df))) stop("Missing column: ", position_col)
+  if (!(company_col %in% names(df))) df[[company_col]] <- ""
+
+  out_list <- mapply(
+    FUN = function(pos, comp) isco_code_safe(pos, comp),
+    df[[position_col]],
+    df[[company_col]],
+    SIMPLIFY = FALSE
+  )
+
+  out_df <- bind_rows(lapply(out_list, as.data.frame))
+
+  bind_cols(df, out_df)
+}
+
+# Run the data through the API 
+result <- isco_code_df(df_panel, position_col = "Position", company_col = "Company")
+
+#save 
+# write.csv(result, "result.csv", row.names = FALSE)
+```
+
+## Compare Results to Manual Coding
+
+```{r}
+# Load manual coding
+result <- read_csv("")
+jobs_with_id <- read_csv("")
+
+# add ID to both for matching
+result <- result |> 
+  mutate(id = row_number())
+jobs_with_id <- jobs_with_id |> 
+  mutate(id = row_number())
+
+# merge datasets
+joined_df <- jobs_with_id |> 
+  left_join(result, by = "id")
+joined_df <- joined_df |> 
+  mutate(isco4_manual = `ISCO 4 digit`)
+
+#write.csv(joined_df, "joined_df.csv", row.names = FALSE)
+```
+
+```{r}
+# Calculate percent match
+accuracy_levels <- joined_df |> 
+  mutate(
+    isco4_code   = str_squish(isco4_code),
+    isco4_manual = str_squish(isco4_manual)
+) |> 
+  filter(!is.na(isco4_code), !is.na(isco4_manual)) |> 
+  summarise(
+    accuracy_1digit = mean(substr(isco4_code, 1, 1) == substr(isco4_manual, 1, 1)) * 100,
+    accuracy_2digit = mean(substr(isco4_code, 1, 2) == substr(isco4_manual, 1, 2)) * 100,
+    accuracy_3digit = mean(substr(isco4_code, 1, 3) == substr(isco4_manual, 1, 3)) * 100,
+    accuracy_4digit = mean(isco4_code == isco4_manual) * 100,
+    n = n()
+  )
+
+accuracy_levels
+```
