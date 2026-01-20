@@ -1,9 +1,9 @@
-# Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market
+# Strong Ties and Stable Jobs: Occupational Embeddedness in the Labor Market (Online Appendix)
 
 **Lydia Camp**  
 [`https://lydiagcamp.github.io`](https://lydiagcamp.github.io)
 
-This repository contains the data and replication code for a paper examining the effect of workplace networks on job precarity.
+This repository contains data and replicable code for a paper that explains differences in job insecurity across occupations using a network-based approach. The project introduces occupational embeddedness, defined as the overlap between workers’ professional and personal social ties, and shows that occupations with stronger internal networks tend to offer greater job security to their members.
 
 ## Replication Materials
 - **Full Paper**  
